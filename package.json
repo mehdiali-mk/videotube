@@ -1,0 +1,30 @@
+{
+  "name": "videotube",
+  "version": "1.0.0",
+  "description": "Here is a video tube backend project inspired by youtube.",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon src/index.js"
+  },
+  "keywords": [
+    "MERN",
+    "MongoDb",
+    "Node",
+    "Express",
+    "Backend",
+    "Javascript"
+  ],
+  "author": "Mehdiali Kadiwala",
+  "license": "ISC",
+  "devDependencies": {
+    "prettier": "^3.4.2"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "mongoose": "^8.10.0"
+  }
+}
