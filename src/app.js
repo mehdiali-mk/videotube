@@ -2,6 +2,7 @@ import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import { errorHandler } from "./middlewares/error.middlewares.js";
 
 const app = express();
 
@@ -23,8 +24,11 @@ app.use(cookieParser());
 
 // Importing route.
 import healthCheckRouter from "./routes/healthCheck.routes.js";
+import userRouter from "./routes/user.routes.js";
 
 // Routes
 app.use("/api/v1/healthCheck", healthCheckRouter);
+app.use("/api/v1/user", userRouter);
 
+app.use(errorHandler);
 export { app };
