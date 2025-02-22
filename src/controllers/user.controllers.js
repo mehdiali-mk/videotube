@@ -7,6 +7,35 @@ import {
     deleteFromCloudinary,
 } from "../utils/cloudinary.utils.js";
 
+const generateAccessAndRefreshToken = async function (userId) {
+    try {
+        const user = await User.findById(userId);
+
+        if (!user) {
+            throw new ApiError(
+                500,
+                "Cannot find user for access and refresh token. " + userId
+            );
+        }
+
+        const accessToken = user.generateAccessToken();
+        const refreshToken = user.generateRefreshToken();
+
+        user.refreshToken = refreshToken;
+        await user.save({ validateBeforeSave: false });
+
+        return {
+            accessToken,
+            refreshToken,
+        };
+    } catch {
+        throw new ApiError(
+            500,
+            "Error occurred while generating access and refresh tokens."
+        );
+    }
+};
+
 const registerUser = asyncHandler(async (request, response) => {
     const { fullName, email, userName, password } = request.body;
 
@@ -106,4 +135,55 @@ const registerUser = asyncHandler(async (request, response) => {
     }
 });
 
-export { registerUser };
+const loginUser = asyncHandler(async (request, response) => {
+    const { email, password, userName } = request.body;
+
+    if (
+        [fullName, email, userName, password].some(
+            (field) => field?.trim() === ""
+        )
+    ) {
+        throw new ApiError(400, "All fields are required.");
+    }
+
+    const user = await User.findOne({
+        $or: [{ userName }, { email }],
+    });
+
+    if (!user) {
+        throw new ApiError(404, "User doesn't exists!");
+    }
+
+    const isPasswordValid = await user.isPasswordCorrect(password);
+
+    if (!isPasswordValid) {
+        throw new ApiError(404, "Incorrect password");
+    }
+
+    const { accessToken, refreshToken } = await generateAccessAndRefreshToken(
+        user._id
+    );
+
+    const loggedInUser = await User.findById(user._id).select(
+        "-password -refreshToken"
+    );
+
+    const option = {
+        httpOnly: true,
+        secure: process.env.NODE_DEV === "production",
+    };
+
+    return response
+        .status(200)
+        .cookie("accessToken", accessToken, option)
+        .cookie("refreshToken", refreshToken, option)
+        .json(
+            new ApiResponse(
+                200,
+                { user: loggedInUser, accessToken, refreshToken },
+                "User Logged in successfully..."
+            )
+        );
+});
+
+export { registerUser, loginUser };
