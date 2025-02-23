@@ -7,6 +7,7 @@ import {
     deleteFromCloudinary,
 } from "../utils/cloudinary.utils.js";
 import jwt from "jsonwebtoken";
+import { response } from "express";
 
 const generateAccessAndRefreshToken = async function (userId) {
     try {
@@ -187,6 +188,29 @@ const loginUser = asyncHandler(async (request, response) => {
         );
 });
 
+const logoutUser = asyncHandler(async (request, response) => {
+    await User.findByIdAndUpdate(
+        request.user._id,
+        {
+            $set: {
+                refreshToken: undefined,
+            },
+        },
+        { new: true }
+    );
+
+    const options = {
+        httpOnly: true,
+        secure: process.env.NODE_DEV === "production",
+    };
+
+    return response
+        .status(200)
+        .clearCookie("accessToken", options)
+        .clearCookie("refreshToken", options)
+        .json(new ApiResponse(200, "User logged out successfully."));
+});
+
 const refreshAccessToken = asyncHandler(async (request, response) => {
     const incomingRefreshToken =
         request.cookie.refreshToken || request.body.refreshToken;
@@ -238,4 +262,112 @@ const refreshAccessToken = asyncHandler(async (request, response) => {
     }
 });
 
-export { registerUser, loginUser };
+const changeCurrentPassword = asyncHandler(async (request, response) => {
+    const { oldPassword, newPassword } = request.body;
+
+    const user = await User.findById(request.user?._id);
+
+    const isPasswordValid = await user.isPasswordCorrect(oldPassword);
+
+    if (!isPasswordCorrect) {
+        throw new ApiError(401, "Old Password is invalid.");
+    }
+
+    user.password = newPassword;
+
+    await user.save({ validateBeforeSave: false });
+
+    return response
+        .status(200)
+        .json(new ApiResponse(200, {}, "Password changed successfully."));
+});
+
+const getCurrentUser = asyncHandler(async (request, response) => {
+    return response
+        .status(200)
+        .json(new ApiResponse(200, request.user, "Current user details."));
+});
+
+const updateAccountDetails = asyncHandler(async (request, response) => {
+    const { fullName, email } = request.body;
+
+    if (!fullName || !email) {
+        throw new ApiError(404, "Fullname and email are required.");
+    }
+
+    const user = await User.findByIdAndUpdate(
+        request.user?._id,
+        {
+            $set: {
+                fullName,
+                email: email,
+            },
+        },
+        { new: true }
+    ).select("-password -refreshToken");
+
+    return response
+        .status(200)
+        .json(new ApiResponse(200, user, "Details has been updated..."));
+});
+
+const updateAvatar = asyncHandler(async (request, response) => {
+    const avatarLocalPath = request.file?.path;
+
+    if (!avatarLocalPath) {
+        throw new ApiError(400, "Avatar file is required.");
+    }
+
+    const newAvatar = await uploadOnCloudinary(avatarLocalPath);
+
+    if (!newAvatar.url) {
+        throw new ApiError(500, "Error while updating avatar on cloudinary.");
+    }
+
+    const user = await User.findByIdAndUpdate(
+        request.user?._id,
+        {
+            $set: {
+                avatar: newAvatar.url,
+            },
+        },
+        { new: true }
+    ).select("-password -refreshToken");
+
+    response
+        .status(200)
+        .json(new ApiResponse(200, user, "Avatar updated successfully"));
+});
+
+const updateCoverImage = asyncHandler(async (request, response) => {
+    const coverImageLocalPath = request.file?.path;
+
+    if (!coverImageLocalPath) {
+        throw new ApiError(400, "Cover image is required.");
+    }
+
+    const newCoverImage = uploadOnCloudinary(coverImageLocalPath);
+
+    if (!newCoverImage.url) {
+        throw new ApiError(
+            500,
+            "Error while updating cover image on cloudinary."
+        );
+    }
+
+    const user = await User.findByIdAndUpdate(
+        request.user?._id,
+        {
+            $set: {
+                coverImage: newCoverImage.url,
+            },
+        },
+        { new: true }
+    ).select("-password -refreshToken");
+
+    response
+        .status(200)
+        .json(new ApiResponse(200, user, "coverIamge updated successfully."));
+});
+
+export { registerUser, loginUser, logoutUser };
